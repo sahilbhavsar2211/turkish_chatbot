@@ -102,23 +102,118 @@ def get_schema_description(engine, table_names):
 
     return schema_description.strip()
 
-def generate_sql_query(user_question, schema):
+def generate_sql_query(user_question):
     """Generate SQL query from user question using LLM"""
     prompt = f"""
 You are a SQL expert. Given the database schema below, generate a SQL query to answer the user's question.
 
 DATABASE SCHEMA:
-{schema}
+
+TABLE: nld_table
+Description: Netherlands location and device data
+Columns (38 total):
+- __time (TIMESTAMP): timestamp format 2024-01-30T15:00:00.000Z
+- gender (VARCHAR): Male/Female or empty
+- city (VARCHAR): Amsterdam, Almere, etc. or empty
+- year (INT): 2024
+- latitude (FLOAT): geographical latitude
+- wz_district (VARCHAR): district names like Vinkel, Alkmaar
+- language (VARCHAR): Arabic, English, Dutch, etc.
+- poi_name (VARCHAR): point of interest names like Vondelpark or empty
+- hour (INT): 0-23 hour of day
+- ipv4 (VARCHAR): IP addresses like 143.179.120.164
+- ipv6 (VARCHAR): IPv6 addresses, mostly empty
+- geohash (VARCHAR): geohash strings like u15y5sux
+- hz_city (VARCHAR): city names or empty
+- wz_city (VARCHAR): city names like Rotterdam, Vinkel
+- id_type (INT): 0 or 1
+- model (VARCHAR): device models like Galaxy S10, Redmi Note 9
+- hz_neighborhood_rank (VARCHAR): mostly empty
+- maid (VARCHAR): UUID format mobile advertising ID
+- make (VARCHAR): device manufacturers like samsung, xiaomi
+- day (INT): day of month (1-31)
+- hz_district (VARCHAR): district names like Almere or empty
+- longitude (FLOAT): geographical longitude
+- timestamp (BIGINT): Unix timestamp
+- day_of_week (INT): day of week (1-7)
+- app (VARCHAR): app identifiers like com.fugo.wow
+- connection_type (VARCHAR): Wifi, 4G, etc.
+- profile (VARCHAR): user profiles, mostly empty
+- wz_neighborhood_rank (INT): neighborhood ranking like 47, 59
+- lin_name (VARCHAR): location names like Damrak or empty
+- poi_fclass (VARCHAR): POI categories like water, park
+- minute (INT): 0-59 minute of hour
+- wz_neighborhood (VARCHAR): neighborhood names like Haarlem, Weesp
+- hz_neighborhood (VARCHAR): neighborhood names or empty
+- carrier (VARCHAR): telecom carriers like Kpn, Vodafone Nl
+- lin_fclass (VARCHAR): location categories like canal or empty
+- month (INT): month number (1-12)
+- district (VARCHAR): district names like Tilburg, Zevenaar
+- neighborhood (VARCHAR): neighborhood names like Spijkenisse, Leiderdorp
+- age (INT): user age 0-100+
+
+TABLE: tur_table
+Description: Turkey location and device data
+Columns (42 total):
+- __time (TIMESTAMP): timestamp format 2024-05-26T11:00:00.000Z
+- gender (VARCHAR): mostly empty
+- city (VARCHAR): Antalya, etc. or empty
+- year (INT): 2024
+- wz_city_rank (INT): city ranking 0-10
+- latitude (FLOAT): geographical latitude
+- wz_district (VARCHAR): district names like Alanya, Konyaaltı
+- language (VARCHAR): Turkish, Arabic, Russian, German, etc.
+- poi_name (VARCHAR): POI names like Gator, Hippie Cat or empty
+- hour (INT): 0-23 hour of day
+- ipv4 (VARCHAR): IP addresses like 178.240.129.0
+- ipv6 (VARCHAR): IPv6 addresses, mostly empty
+- geohash (VARCHAR): geohash strings like swqzbhh7
+- hz_city (VARCHAR): city names like Antalya, Hatay
+- wz_city (VARCHAR): city names like Antalya, Denizli
+- id_type (INT): 0 or 1
+- model (VARCHAR): device models like a10s, dandelion or empty
+- wz_district_rank (INT): district ranking 0-10
+- hz_neighborhood_rank (INT): neighborhood ranking 0-10
+- maid (VARCHAR): UUID format mobile advertising ID
+- make (VARCHAR): device manufacturers like samsung, xiaomi, huawei
+- day (INT): day of month (1-31)
+- hz_district (VARCHAR): district names like Alanya, Konyaaltı
+- longitude (FLOAT): geographical longitude
+- timestamp (BIGINT): Unix timestamp
+- day_of_week (INT): day of week (1-7)
+- app (VARCHAR): app identifiers like com.jaumo, com.viber.voip
+- connection_type (VARCHAR): Wifi, 3G, 4G, etc.
+- profile (VARCHAR): user profiles like fashion_lover, sme or empty
+- wz_neighborhood_rank (INT): neighborhood ranking 0-10
+- lin_name (VARCHAR): street names like Milli Egemenlik Caddesi or empty
+- poi_fclass (VARCHAR): POI categories like clothes, farmland
+- hz_city_rank (INT): city ranking 0-10
+- minute (INT): 0-59 minute of hour
+- wz_neighborhood (VARCHAR): neighborhood names like Şekerhane Mahallesi or empty
+- hz_neighborhood (VARCHAR): neighborhood names like Çarşı Mahallesi or empty
+- carrier (VARCHAR): telecom carriers like Turkcell, Vodafone Tr
+- lin_fclass (VARCHAR): location categories like tertiary, residential or empty
+- month (INT): month number (1-12)
+- district (VARCHAR): district names like Alanya, Kumluca
+- neighborhood (VARCHAR): neighborhood names like Çarşı Mahallesi or empty
+- age (INT): user age 0-100+
+- hz_district_rank (INT): district ranking 0-10
 
 USER QUESTION: {user_question}
 
 INSTRUCTIONS:
 1. Generate ONLY the SQL query, no explanations
 2. Use proper MySQL syntax
-3. Make sure the query is syntactically correct
+3. Make sure the query is syntactically correct and follows MySQL conventions
 4. Use appropriate JOINs if multiple tables are needed
-5. Include appropriate WHERE clauses, GROUP BY, ORDER BY as needed
-6. Return only the SQL query without any markdown formatting or extra text
+5. Include appropriate WHERE clauses, GROUP BY, ORDER BY, and LIMIT as needed
+6. Handle potential NULL values appropriately using IS NULL or IS NOT NULL
+7. Use proper aggregation functions (COUNT, SUM, AVG, MAX, MIN) when needed
+8. For time-based queries, use appropriate date/time functions
+9. Use DISTINCT maid to avoid duplicate entries in results
+10. Consider performance by adding appropriate conditions to limit result sets
+11. Use proper column aliases for readability when needed
+12. Return only the SQL query without any markdown formatting, backticks, or extra text
 
 SQL QUERY:
 """
@@ -183,14 +278,14 @@ If there are no results, explain that no data was found matching the criteria.
     except Exception as e:
         return f"❌ Error generating response: {e}"
 
-def ask_database_question(engine, user_question, schema):
+def ask_database_question(engine, user_question):
     """Main function to process user question and return answer"""
     print(f"\n🔍 User Question: {user_question}")
     print("="*80)
     
     # Step 1: Generate SQL query
     print("📝 Generating SQL query...")
-    sql_query = generate_sql_query(user_question, schema)
+    sql_query = generate_sql_query(user_question)
     
     if not sql_query:
         return "❌ Failed to generate SQL query"
@@ -237,8 +332,8 @@ if __name__ == "__main__":
             print("❌ No tables found in database")
             exit(1)
         
-        schema = get_schema_description(engine, all_tables)
-        print(f"\n📄 Database Schema:\n{schema}")
+        # schema = get_schema_description(engine, all_tables)
+        # print(f"\n📄 Database Schema:\n{schema}")
         
         # Interactive user input loop
         print("\n🚀 Database Assistant Ready!")
@@ -256,7 +351,7 @@ if __name__ == "__main__":
                     break
                 
                 # Process the question
-                result = ask_database_question(engine, user_question, schema)
+                result = ask_database_question(engine, user_question)
                 print("\n" + "="*100 + "\n")
                 
             except EOFError:

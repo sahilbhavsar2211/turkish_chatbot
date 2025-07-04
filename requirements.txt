@@ -3,3 +3,6 @@ openai
 python-dotenv
 langchain-openai
 pymysql
+fastapi
+streamlit
+sqlalchemy

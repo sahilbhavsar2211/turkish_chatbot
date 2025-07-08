@@ -31,7 +31,8 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    # allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -94,7 +95,7 @@ TABLE: nld_table (Netherlands data)
 - language (VARCHAR): 'Dutch', 'English', 'Arabic', 'German', etc.
 - hz_neighborhood_rank (VARCHAR): Income decile ranks ('1'-'10', where '10'=highest income, '1'=lowest)
 - poi_fclass (VARCHAR): Point of interest categories like 'water', 'park', 'pitch', 'graveyard', 'hairdresser', 'residential', 'industrial'
-- profile (VARCHAR): User profiles like 'abroad_vacationer', 'bank_visitor'
+- profile (JSON): User profiles like 'abroad_vacationer', 'bank_visitor'
 - app (VARCHAR): Mobile app identifiers
 
 TABLE: tur_table (Turkey data)  
@@ -107,7 +108,7 @@ TABLE: tur_table (Turkey data)
 - language (VARCHAR): 'Turkish', 'Arabic', 'Russian', 'German', 'Dutch', 'Danish', 'Slovak', etc.
 - hz_neighborhood_rank (VARCHAR): Income decile ranks ('1'-'10', where '10'=highest income, '1'=lowest)
 - poi_fclass (VARCHAR): Point of interest categories like 'farmland', 'clothes', 'restaurant', 'hospital', 'attraction', 'pitch', 'nature_reserve', 'mall'
-- profile (VARCHAR): User profiles like 'abroad_vacationer', 'highschool_student', 'football_follower', 'vegan', 'fashion_lover', 'sme'
+- profile (JSON): User profiles like 'abroad_vacationer', 'highschool_student', 'football_follower', 'vegan', 'fashion_lover', 'sme'
 - app (VARCHAR): Mobile app identifiers
 
 IMPORTANT MAPPING RULES:
@@ -119,9 +120,9 @@ IMPORTANT MAPPING RULES:
 2. GENDER IDENTIFICATION:
    - Male/Father/Dad (erkek/baba) → gender = 'Male' OR app IN (male_apps_list)
    - Female/Mother/Mom (kadın/anne) → gender = 'Female' OR app IN (female_apps_list)
-   - Male apps: 'net.peakgames.Yuzbir', 'Mackolik - Live Sports Results', 'Sahadan Canlı Sonuçlar', 'ASPOR- Canlı Yayın, Spor', 'Okey Plus', 'GOAL Live Scores', 'com.sahibinden', 'Bitcoin Solitaire - Get Real Free Bitcoin!', 'Doviz - Altin, Borsa, Kripto', 'com.supercell.clashofclans2'
-   - Female apps: 'Faladdin: Tarot & Horoscopes', 'Happy Kids • Bebek Gelişimi', 'Happy Mom • Hamilelik Takibi', 'Pregੈ
-nancy tracker, 'Hamilelik Takibi'
+   - Male apps: 'net.peakgames.Yuzbir', 'Mackolik - Live Sports Results', 'Mackolik Canlı Sonuçlar','398157427','Sahadan Canlı Sonuçlar', 'ASPOR- Canlı Yayın, Spor','Karakartal Haber & Canlı Skor', 'Sporx - Spor Haber, Canlı Skor', 'ASPOR-Canlı yayınlar, maç özet', 'FOTOMAÇ–Son dakika spor, haber','FOTOMAÇ–Son dakika spor haberl','Batak - Tekli, Eşli, Koz Maça', 'Okey - İnternetsiz', 'Okey Plus', 'Okey Vip', 'Çanak Okey Plus','101 Okey - İnternetsiz','101 YüzBir Okey Plus','101 Okey HD-İnternetsiz YüzBir',
+'101 Okey İnternetsiz HD Yüzbir','1176147574','GOAL Live Scores','Goal live scores','GOAL - Football News & Scores', 'Play Football 2024- Real Goal','6470622761','766443283', 'com.sahibinden','986339882','Football Manager GM - NFL game', 'Bitcoin Solitaire - Get Real Free Bitcoin!','Bitcoin Blocks - Get Bitcoin!','Bitcoin Blast - Earn Bitcoin!','Bitcoin Pop - Get Bitcoin!','Bitcoin Food Fight', 'Doviz - Altin, Borsa, Kripto','A PARA - Borsa, Döviz, Hisse','com.halkaarzhaber.hisseler','Fan of Guns: FPS Pixel Shooter','com.supercell.clashofclans2','com.m3android7s.projects.clashofclansbaselayouts','Mafia Sniper — Wars of Clans'
+   - Female apps: '1349245161','1141379201','1517065214','938845147','386022579','289560144','1391655378','Faladdin: Tarot & Horoscopes', 'com.faladdin.app','Happy Kids • Bebek Gelişimi', 'kidslearnigstudios.exerciseforkids.fitnesskidsworkout','com.family.locator.find.my.kids','com.bubadu.doctorkids','com.shaimaa.yogaforkids','com.familylocator.life360.locationtracker.findmykids','com.hippo.coloring_book_kids','Happy Mom • Hamilelik Takibi','mommy.care.games','com.gt.richi.rich.mommy.games.family.simulator','Elika Bebek Gelişimi Takibi','com.kksal55.bebektakibi','Gün Gün Bebek Bakımı, Takibi','com.stillnewagain.bebekgelisim','com.neownd.sound.joy.meditation.sleep.whitenoise','com.lionroar.mommynewbornbabydaycare','pregnant.mom','Pregnancy tracker week by week','Hamilelik Takibi','com.kksal55.hamileliktakibi','com.stillnewagain.hamiletakip'
 
 3. INCOME BRACKET MAPPING (hz_neighborhood_rank):
    - Top 10% / İlk %10 → '10'
@@ -183,12 +184,14 @@ INSTRUCTIONS:
 5. For multiple cities, use IN ('city1', 'city2', ...) or NOT IN for exclusions
 6. For multiple POI categories, use IN ('category1', 'category2', ...)
 7. For age ranges, use: age BETWEEN min_age AND max_age
-8. For gender identification, use OR condition combining direct gender and app-based inference
-9. For tourists/foreigners, use language NOT IN with the local language
-10. Handle multiple profiles with IN clause
-11. Use proper WHERE clause combinations with AND/OR as needed
-12. Use standard MySQL syntax - no double quotes around table/column names
-13. Return ONLY the SQL query ready for execution without formatting, backticks, or explanations
+8. For gender identification for turkey, use OR condition combining direct gender and app-based inference
+9. For gender identification for netherlands, use only gender column
+10. For tourists/foreigners, use language NOT IN with the local language
+11. Handle multiple profiles with IN clause and keep in mind that profile is a JSON field
+12. Use proper WHERE clause combinations with AND/OR as needed
+13. Use standard MySQL syntax - no double quotes around table/column names
+14. Return ONLY the SQL query ready for execution without formatting, backticks, or explanations
+
 
 SQL QUERY:
 """

@@ -1,12 +1,17 @@
+from pydantic import BaseModel
 import os
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from langchain.schema.runnable import RunnableLambda  # Add this import above
+from langchain_core.output_parsers import StrOutputParser
+# Import StrOutputParser
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.exc import SQLAlchemyError
 from langchain_openai import ChatOpenAI
+from langchain.prompts import PromptTemplate
 import pandas as pd
 
 # Load .env
@@ -39,6 +44,8 @@ app.add_middleware(
 )
 
 # DB Connection Creator
+
+
 def create_db_engine():
     try:
         encoded_user = quote_plus(DB_USER)
@@ -59,6 +66,8 @@ def create_db_engine():
         return None
 
 # Lifespan event to init and dispose engine
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global engine
@@ -73,12 +82,14 @@ async def lifespan(app: FastAPI):
 app.router.lifespan_context = lifespan
 
 # API Models
-from pydantic import BaseModel
+
 
 class ChatRequest(BaseModel):
     message: str
 
 # Core logic
+
+
 def generate_sql_query(user_question):
     prompt = f"""
 You are a SQL expert. Given the database schema below, generate a SQL query to answer the user's question.
@@ -203,6 +214,7 @@ SQL QUERY:
         print(f"❌ LLM error: {e}")
         return None
 
+
 def execute_sql_query(sql_query):
     global engine
     try:
@@ -217,6 +229,7 @@ def execute_sql_query(sql_query):
                 return {"message": f"Query executed. Rows affected: {result.rowcount}"}
     except Exception as e:
         return {"error": str(e)}
+
 
 def generate_natural_response(user_question, sql_query, query_results):
     prompt = f"""
@@ -234,16 +247,88 @@ If there are no results, explain that no data was found matching the criteria.
     except Exception as e:
         return f"❌ Failed to generate response: {e}"
 
-# API endpoint
-@app.post("/api/chat")
-async def chat_endpoint(req: ChatRequest):
+
+def classification(user_question):
+    """
+    Classify the user questions to determine whether is it greeting or not.
+    """
+
+    prompt = f"""
+     You are the classification expert. Classify the user question into one of the following categories:
+        - greeting
+        - data_query
+    USER QUESTION: {user_question}
+    INSTRUCTIONS:
+    1. If the question is a greeting, classify it as "greeting".
+    2. If the question is a data query, classify it as "data_query".
+    3. If the questions is not matching any of the above categories, classify it as "data_query".
+    4. Return only the classification result like "greeting" or "data_query" without any additional text or formatting.
+    5. If prompt is about the capabilities or something like "What can you do?", classify it as "greeting".
+    6. If the message is casual or conversational with no clear intent to retrieve data (e.g., "okay", "cool", "nice", "bye", "thanks"), classify it as "greeting".
+    """
+
+    try:
+        response = llm.invoke(prompt)
+        return response.content.strip().lower()
+
+    except Exception as e:
+        print(f"❌ Classification error: {e}")
+        return "unknown"
+
+
+def greeting_response(user_question):
+    """
+    Generate a greeting response.
+    """
+
+    prompt = f"""
+You are a friendly and polite assistant. Respond appropriately to the user's message.
+
+- If the user says "thank you", respond with a friendly acknowledgment like "You're welcome!" or "Glad I could help!"
+- If the user says "you're welcome", "okay", or "cool", respond politely or acknowledge with a short, friendly message.
+- If the user says "bye", "goodbye", or ends the conversation, respond with a warm farewell like "Take care!" or "Have a great day!"
+
+USER MESSAGE: {user_question}
+    """
+
+    response = llm.invoke(prompt)
+    print(f"Greeting response: {response.content.strip()}")
+    return response
+
+
+def handle_classification(user_question):
+    """
+    Handle the classification of user questions to determine whether it is a greeting or a data query.
+    """
+    classification_result = classification(user_question)
+    print(f"Classification result: {classification_result}")
+
+    if classification_result == "greeting":
+        print("User greeting detected.")
+        return {
+            "question": user_question,
+            "sql_query": None,
+            "results": None,
+            "response": greeting_response(user_question).content.strip()
+        }
+    elif classification_result == "data_query":
+        print("User data query detected.")
+        # Proceed to generate SQL query
+        return ask_database(user_question=user_question)
+    else:
+        raise HTTPException(
+            status_code=400, detail="Unknown classification result.")
+
+
+def ask_database(user_question):
+    """
+    Process the user question to generate SQL query and execute it.
+    """
     global engine
     if engine is None:
         raise HTTPException(status_code=500, detail="DB not initialized.")
 
-    user_question = req.message
     sql_query = generate_sql_query(user_question)
-
     if not sql_query:
         raise HTTPException(status_code=500, detail="Failed to generate SQL")
 
@@ -260,7 +345,17 @@ async def chat_endpoint(req: ChatRequest):
         "response": response
     }
 
+
+@app.post("/api/chat")
+async def chat_endpoint(req: ChatRequest):
+
+    user_question = req.message
+
+    return handle_classification(user_question)
+
 # Health Check
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
